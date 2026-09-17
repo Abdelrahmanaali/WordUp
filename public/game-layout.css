@@ -1,4 +1,4 @@
-/* WordUp game layout v3: true two-panel desktop game + controlled reveal */
+/* WordUp game layout v4: synchronized tile flip + sequential color reveal */
 .game.daily-layout,.game.layout-side{
   width:min(1120px,94vw)!important;
   max-width:none!important;
@@ -18,8 +18,6 @@
 .game.daily-layout .game-meta,.game.layout-side .game-meta{width:min(100%,430px)!important}
 .game.daily-layout .side,.game.layout-side .side{display:none!important}
 
-/* The evaluated color is deliberately hidden until the card reaches the
-   midpoint of the flip. This prevents green/yellow/gray from appearing early. */
 .cell.reveal{transform-style:preserve-3d;backface-visibility:hidden;will-change:transform}
 .cell.reveal-hidden.green,.cell.reveal-hidden.yellow,.cell.reveal-hidden.gray{
   background:var(--cell-bg,#151c29)!important;
