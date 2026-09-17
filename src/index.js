@@ -6,8 +6,8 @@ const json=(d,s=200)=>new Response(JSON.stringify(d),{status:s,headers:{"content
 const nick=v=>String(v||"").trim().replace(/\s+/g," ").slice(0,18);
 const word=v=>String(v||"").trim().toLowerCase().replace(/[^a-z]/g,"").slice(0,5);
 const code=()=>{const c="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";return Array.from({length:6},()=>c[Math.floor(Math.random()*c.length)]).join("")};
-const dailyDate=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"UTC"}).format(new Date());
-const daily=()=>{const day=dailyDate();let h=0;for(const c of day)h=(h*31+c.charCodeAt(0))>>>0;return WORDS[h%WORDS.length]};
+const utcDate=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"UTC"}).format(new Date());
+const daily=()=>{const day=utcDate();let h=0;for(const c of day)h=(h*31+c.charCodeAt(0))>>>0;return WORDS[h%WORDS.length]};
 const randomWord=()=>WORDS[Math.floor(Math.random()*WORDS.length)];
 function score(w,g){const a=Array(5).fill("gray"),r={};for(let i=0;i<5;i++){if(g[i]===w[i])a[i]="green";else r[w[i]]=(r[w[i]]||0)+1}for(let i=0;i<5;i++)if(a[i]==="gray"&&r[g[i]]>0){a[i]="yellow";r[g[i]]--}return a}
 const attempt=(w,g)=>({guess:g,colors:score(w,g)});
@@ -30,7 +30,8 @@ export class GameRoom extends DurableObject{
    this.send(server,{type:"state",state:this.public(s),selfId:pid});this.broadcast({type:"state",state:this.public(s)});return new Response(null,{status:101,webSocket:client});
   }
   if(u.pathname.endsWith("/init")){
-   const b=await req.json().catch(()=>({}));if(s.code)return json({ok:true});s.code=b.code;s.mode="duel";s.timer=TIMER_OPTIONS.includes(+b.timer)?+b.timer:120;s.word=randomWord();s.status="waiting";s.startedAt=null;await this.save(s);return json({ok:true})
+   const b=await req.json().catch(()=>({}));if(s.code)return json({ok:true});
+   s.code=b.code;s.mode="duel";s.timer=TIMER_OPTIONS.includes(+b.timer)?+b.timer:120;s.word=randomWord();s.status="waiting";s.startedAt=null;await this.save(s);return json({ok:true})
   }
   return json({ok:true,state:this.public(s)})
  }
@@ -53,10 +54,15 @@ export class GameRoom extends DurableObject{
 }
 
 export default{async fetch(req,env){const u=new URL(req.url);
- if(u.pathname==="/api/daily"&&req.method==="POST")return json({ok:true,date:dailyDate()});
- if(u.pathname==="/api/daily/guess"&&req.method==="POST"){const b=await req.json().catch(()=>({})),g=word(b.guess),n=+b.attempt;if(g.length!==5)return json({error:"Enter exactly 5 letters."},400);if(!Number.isInteger(n)||n<1||n>6)return json({error:"Only six guesses are allowed."},400);return json({ok:true,correct:g===daily(),colors:score(daily(),g)})}
- if(u.pathname==="/api/daily/reveal")return json({ok:true,word:daily(),date:dailyDate()});
- if(u.pathname==="/api/daily/complete"&&req.method==="POST"){return json({ok:true});}
+ if(u.pathname==="/api/daily"&&req.method==="POST")return json({ok:true,date:utcDate()});
+ if(u.pathname==="/api/daily/guess"&&req.method==="POST"){
+  const b=await req.json().catch(()=>({})),g=word(b.guess),attemptNo=Number(b.attempt)||0;
+  if(g.length!==5)return json({error:"Enter exactly 5 letters."},400);
+  if(attemptNo<1||attemptNo>6)return json({error:"You have used all 6 guesses."},400);
+  return json({ok:true,correct:g===daily(),colors:score(daily(),g)});
+ }
+ if(u.pathname==="/api/daily/reveal"&&req.method==="GET")return json({ok:true,word:daily()});
+ if(u.pathname==="/api/daily/complete"&&req.method==="POST")return json({ok:true});
  if(u.pathname==="/api/create"&&req.method==="POST"){const b=await req.json().catch(()=>({})),name=nick(b.nickname);if(!name)return json({error:"Nickname is required."},400);const c=code(),stub=env.GAME_ROOMS.getByName(c);const r=await stub.fetch(new Request("https://room/init",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({code:c,mode:"duel",timer:b.timer})}));if(!r.ok)return json({error:"Could not create room."},500);return json({ok:true,code:c})}
  if(u.pathname==="/api/history"){if(!env.WORDUP_DB)return json({games:[]});const n=Math.min(+u.searchParams.get("limit")||30,100);const r=await env.WORDUP_DB.prepare("SELECT room_code,mode,player_one_name,player_two_name,winner_name,result,timer_seconds,duration_seconds,created_at FROM games ORDER BY id DESC LIMIT ?").bind(n).all();return json({games:r.results||[]})}
  if(u.pathname.startsWith("/ws/")){const c=u.pathname.split("/")[2]?.toUpperCase();if(!c)return new Response("Missing room code",{status:400});return env.GAME_ROOMS.getByName(c).fetch(req)}
