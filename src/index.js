@@ -63,43 +63,6 @@ export class GameRoom extends DurableObject{
  async persist(s){if(!this.env.WORDUP_DB)return;const p1=s.players[0]||{},p2=s.players[1]||{},now=new Date().toISOString();await this.env.WORDUP_DB.prepare(`INSERT INTO games(room_code,mode,word,timer_seconds,player_one_name,player_two_name,winner_name,result,player_one_guesses,player_two_guesses,player_one_hints,player_two_hints,duration_seconds,started_at,ended_at,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(s.code,s.mode,s.word,s.timer,p1.nickname||null,p2.nickname||null,s.result?.winnerName||null,s.result?.type||"unknown",p1.guesses?.length||0,p2.guesses?.length||0,0,0,s.startedAt&&s.endedAt?Math.round((s.endedAt-s.startedAt)/1000):null,s.startedAt?new Date(s.startedAt).toISOString():null,s.endedAt?new Date(s.endedAt).toISOString():null,now).run()}
 }
 
-const GAMEPLAY_CSS=`
-@media (min-width:951px){
- .game.layout-side,.daily-game{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(390px,480px)!important;max-width:980px!important;gap:34px!important;align-items:start!important;margin:0 auto!important}
- .game.layout-side .side.left,.daily-game .side.left,.game.layout-side .side.right,.daily-game .side.right{display:none!important}
- .game.layout-side .board-area,.daily-game .board-area{display:grid!important;grid-template-columns:minmax(300px,390px) minmax(360px,480px)!important;gap:30px!important;align-items:center!important;width:100%!important;max-width:none!important}
- .game.layout-side .game-meta,.daily-game .game-meta{grid-column:1/-1!important}
- .game.layout-side .board,.daily-game .board{grid-column:1!important;grid-row:2!important;width:min(100%,390px)!important;margin:12px auto 14px!important}
- .game.layout-side .keyboard,.daily-game .keyboard{grid-column:2!important;grid-row:2!important;width:100%!important;margin:0!important;align-self:center!important;padding:12px 0!important}
- .game.layout-side .key,.daily-game .key{height:50px!important}
-}
-.cell.reveal{backface-visibility:hidden;transform-style:preserve-3d}
-.cell.reveal.green{animation:wordupRevealGreen .62s cubic-bezier(.2,.75,.2,1) both}
-.cell.reveal.yellow{animation:wordupRevealYellow .62s cubic-bezier(.2,.75,.2,1) both}
-.cell.reveal.gray{animation:wordupRevealGray .62s cubic-bezier(.2,.75,.2,1) both}
-@keyframes wordupRevealGreen{0%{transform:rotateX(0);filter:brightness(1)}45%{transform:rotateX(90deg);filter:brightness(1.35)}100%{transform:rotateX(0);filter:brightness(1.08)}}
-@keyframes wordupRevealYellow{0%{transform:rotateX(0);filter:brightness(1)}45%{transform:rotateX(90deg);filter:brightness(1.3)}100%{transform:rotateX(0);filter:brightness(1.05)}}
-@keyframes wordupRevealGray{0%{transform:rotateX(0);filter:brightness(1)}45%{transform:rotateX(90deg);filter:brightness(1.2)}100%{transform:rotateX(0);filter:brightness(1)}}
-@media (prefers-reduced-motion:reduce){.cell.reveal.green,.cell.reveal.yellow,.cell.reveal.gray{animation:none}}
-`;
-const REVEAL_PATCH=`
-(()=>{
- const boot=()=>{
-  const board=document.querySelector('#board');if(!board||board.dataset.wordupReveal==='1')return;
-  board.dataset.wordupReveal='1';
-  const reveal=()=>{
-   const rows=[...board.querySelectorAll('.row')].filter(r=>[...r.querySelectorAll('.cell')].some(c=>c.classList.contains('green')||c.classList.contains('yellow')||c.classList.contains('gray')));
-   const row=rows[rows.length-1];if(!row)return;
-   const cells=[...row.querySelectorAll('.cell')];cells.forEach(c=>c.classList.remove('reveal'));
-   cells.forEach((c,i)=>{if(c.classList.contains('green')||c.classList.contains('yellow')||c.classList.contains('gray')){c.style.animationDelay=`${i*120}ms`;requestAnimationFrame(()=>c.classList.add('reveal'));}});
-  };
-  new MutationObserver(()=>reveal()).observe(board,{childList:true,subtree:true});
-  reveal();
- };
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
-})();
-`;
-
 export default{async fetch(req,env){const u=new URL(req.url);
  if(u.pathname==="/api/daily"&&req.method==="POST")return json({ok:true,date:cairoDate()});
  if(u.pathname==="/api/daily/guess"&&req.method==="POST"){
@@ -114,13 +77,5 @@ export default{async fetch(req,env){const u=new URL(req.url);
  if(u.pathname==="/api/create"&&req.method==="POST"){const b=await req.json().catch(()=>({})),name=nick(b.nickname);if(!name)return json({error:"Nickname is required."},400);const c=code(),stub=env.GAME_ROOMS.getByName(c);const r=await stub.fetch(new Request("https://room/init",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({code:c,mode:"duel",timer:b.timer})}));if(!r.ok)return json({error:"Could not create room."},500);return json({ok:true,code:c})}
  if(u.pathname==="/api/history"){if(!env.WORDUP_DB)return json({games:[]});const n=Math.min(+u.searchParams.get("limit")||30,100);const r=await env.WORDUP_DB.prepare("SELECT room_code,mode,player_one_name,player_two_name,winner_name,result,timer_seconds,duration_seconds,created_at FROM games ORDER BY id DESC LIMIT ?").bind(n).all();return json({games:r.results||[]})}
  if(u.pathname.startsWith("/ws/")){const c=u.pathname.split("/")[2]?.toUpperCase();if(!c)return new Response("Missing room code",{status:400});return env.GAME_ROOMS.getByName(c).fetch(req)}
- if(u.pathname==="/styles.css"){
-  const asset=await env.ASSETS.fetch(req),css=await asset.text();
-  return new Response(css+GAMEPLAY_CSS,{status:asset.status,headers:asset.headers});
- }
- if(u.pathname==="/app.js"){
-  const asset=await env.ASSETS.fetch(req),js=await asset.text();
-  return new Response(js+REVEAL_PATCH,{status:asset.status,headers:asset.headers});
- }
  return env.ASSETS.fetch(req)
 }}
