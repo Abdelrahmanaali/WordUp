@@ -8,69 +8,18 @@
   gap:56px!important;
   align-items:center!important;
 }
-.game.daily-layout .board-panel,.game.layout-side .board-panel{
-  min-width:0;
-  display:flex!important;
-  flex-direction:column!important;
-  align-items:center!important;
-  justify-content:center!important;
-}
-.game.daily-layout .keyboard-panel,.game.layout-side .keyboard-panel{
-  min-width:0;
-  width:100%!important;
-  display:flex!important;
-  flex-direction:column!important;
-  justify-content:center!important;
-  align-items:stretch!important;
-  padding:28px!important;
-  border:1px solid #28344a!important;
-  border-radius:26px!important;
-  background:linear-gradient(145deg,#151c29,#0d131e)!important;
-  box-shadow:var(--shadow)!important;
-}
-.game.daily-layout .board,.game.layout-side .board{
-  width:min(100%,430px)!important;
-  margin:18px auto 0!important;
-}
-.game.daily-layout .keyboard,.game.layout-side .keyboard{
-  width:100%!important;
-  margin:0!important;
-}
-.game.daily-layout .key,.game.layout-side .key{height:54px!important;}
-.game.daily-layout .game-meta,.game.layout-side .game-meta{width:min(100%,430px)!important;}
-.game.daily-layout .side,.game.layout-side .side{display:none!important;}
-
-/* Real Wordle-style flip: each tile turns away, then lands with its evaluated color. */
-.cell.reveal{
-  transform-style:preserve-3d;
-  backface-visibility:hidden;
-  will-change:transform;
-}
-.cell.reveal.green{animation:wordupFlip .58s cubic-bezier(.2,.75,.2,1) both;}
-.cell.reveal.yellow{animation:wordupFlip .58s cubic-bezier(.2,.75,.2,1) both;}
-.cell.reveal.gray{animation:wordupFlip .58s cubic-bezier(.2,.75,.2,1) both;}
-@keyframes wordupFlip{
-  0%{transform:perspective(500px) rotateX(0deg);filter:brightness(1)}
-  42%{transform:perspective(500px) rotateX(90deg);filter:brightness(1.35)}
-  58%{transform:perspective(500px) rotateX(90deg);filter:brightness(1.35)}
-  100%{transform:perspective(500px) rotateX(0deg);filter:brightness(1)}
-}
-@media (prefers-reduced-motion:reduce){.cell.reveal{animation:none!important}}
-
-@media(max-width:950px){
-  .game.daily-layout,.game.layout-side{
-    width:min(520px,94vw)!important;
-    display:block!important;
-  }
-  .game.daily-layout .board-panel,.game.layout-side .board-panel{width:100%!important;}
-  .game.daily-layout .keyboard-panel,.game.layout-side .keyboard-panel{
-    margin-top:22px!important;
-    padding:18px!important;
-  }
-  .game.daily-layout .board,.game.layout-side .board{width:min(100%,390px)!important;}
-}
-@media(max-width:600px){
-  .game.daily-layout,.game.layout-side{width:100%!important;}
-  .game.daily-layout .keyboard-panel,.game.layout-side .keyboard-panel{padding:12px!important;border-radius:20px!important;}
-  .game.daily-layout .key,.game.layout-side .key{height:48px!important;}
-}
+.game.daily-layout .board-panel,.game.layout-side .board-panel{min-width:0;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important}
+.game.daily-layout .keyboard-panel,.game.layout-side .keyboard-panel{min-width:0;width:100%!important;display:flex!important;flex-direction:column!important;justify-content:center!important;align-items:stretch!important;padding:28px!important;border:1px solid #28344a!important;border-radius:26px!important;background:linear-gradient(145deg,#151c29,#0d131e)!important;box-shadow:var(--shadow)!important}
+.keyboard-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;color:#68758a;font-size:9px;font-weight:700;letter-spacing:.16em}
+.keyboard-title span:first-child{color:#cbd3df}
+.game.daily-layout .board,.game.layout-side .board{width:min(100%,430px)!important;margin:18px auto 0!important}
+.game.daily-layout .keyboard,.game.layout-side .keyboard{width:100%!important;margin:0!important}
+.game.daily-layout .key,.game.layout-side .key{height:54px!important}
+.game.daily-layout .game-meta,.game.layout-side .game-meta{width:min(100%,430px)!important}
+.game.daily-layout .side,.game.layout-side .side{display:none!important}
+.cell.reveal{transform-style:preserve-3d;backface-visibility:hidden;will-change:transform}
+.cell.reveal.green,.cell.reveal.yellow,.cell.reveal.gray{animation:wordupFlip .58s cubic-bezier(.2,.75,.2,1) both}
+@keyframes wordupFlip{0%{transform:perspective(500px) rotateX(0deg);filter:brightness(1)}42%{transform:perspective(500px) rotateX(90deg);filter:brightness(1.35)}58%{transform:perspective(500px) rotateX(90deg);filter:brightness(1.35)}100%{transform:perspective(500px) rotateX(0deg);filter:brightness(1)}}
+@media(prefers-reduced-motion:reduce){.cell.reveal{animation:none!important}}
+@media(max-width:950px){.game.daily-layout,.game.layout-side{width:min(520px,94vw)!important;display:block!important}.game.daily-layout .board-panel,.game.layout-side .board-panel{width:100%!important}.game.daily-layout .keyboard-panel,.game.layout-side .keyboard-panel{margin-top:22px!important;padding:18px!important}.game.daily-layout .board,.game.layout-side .board{width:min(100%,390px)!important}}
+@media(max-width:600px){.game.daily-layout,.game.layout-side{width:100%!important}.game.daily-layout .keyboard-panel,.game.layout-side .keyboard-panel{padding:12px!important;border-radius:20px!important}.game.daily-layout .key,.game.layout-side .key{height:48px!important}}
