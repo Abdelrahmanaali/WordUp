@@ -1,1 +1,430 @@
-const $=s=>document.querySelector(s);const $$=s=>[...document.querySelectorAll(s)];const screens=["home","play","mode","config","join","lobby","game","result","records"];const S={screen:"home",mode:"daily",timer:120,code:null,nickname:"",ws:null,room:null,playerId:localStorage.getItem("wordupPlayerId")||crypto.randomUUID(),keyState:{},inputBuffer:"",daily:null,clockInterval:null,sideLayout:false};localStorage.setItem("wordupPlayerId",S.playerId);try{S.sideLayout=localStorage.getItem("wordupLayout")==="side"}catch(e){}const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));const fmt=ms=>{const s=Math.max(0,Math.ceil(ms/1000));return `${String(Math.floor(s/3600)).padStart(2,"0")} : ${String(Math.floor((s%3600)/60)).padStart(2,"0")} : ${String(s%60).padStart(2,"0")}`};function show(n){S.screen=n;screens.forEach(x=>$("#"+x+"Screen")?.classList.toggle("active",x===n));window.scrollTo({top:0,behavior:"smooth"})}function toast(m){const t=$("#toast");if(!t)return;t.textContent=m;t.classList.add("show");clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove("show"),2400)}function updateHomeCountdown(){const now=new Date();const parts=new Intl.DateTimeFormat("en-US",{timeZone:"Africa/Cairo",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false}).formatToParts(now).reduce((a,p)=>(a[p.type]=p.value,a),{});const total=Number(parts.hour)*3600+Number(parts.minute)*60+Number(parts.second);const left=(86400-total)%86400;const e=$("#dailyCountdown");if(e)e.textContent=`${String(Math.floor(left/3600)).padStart(2,"0")} : ${String(Math.floor((left%3600)/60)).padStart(2,"0")} : ${String(left%60).padStart(2,"0")}`;const sub=document.querySelector(".hero-reset-sub");if(sub)sub.textContent="New daily word at Egypt midnight"}function dailyHide(on){[$("#gameScreen .game-top .pill.right"),$("#gameScreen .side.left"),$("#gameScreen .side.right")].filter(Boolean).forEach(e=>e.classList.toggle("daily-hide",on));$("#gameScreen .game")?.classList.toggle("daily-game",on)}const KEYS=["qwertyuiop","asdfghjkl","zxcvbnm"];function applyLayout(){const g=$("#gameScreen .game"),b=$("#layoutToggle");if(!g)return;const desktop=window.matchMedia("(min-width:951px)").matches;g.classList.toggle("layout-side",desktop&&S.sideLayout);if(b){b.textContent=desktop?(S.sideLayout?"▣":"⌘"):"⌘";b.title=desktop?(S.sideLayout?"Use stacked layout":"Move keyboard to the right"):"Desktop layout options"}}function renderKeyboard(){const b=$("#keyboard");if(!b)return;b.innerHTML="";KEYS.forEach((letters,i)=>{const r=document.createElement("div");r.className="key-row";if(i===2){const e=document.createElement("button");e.className="key wide";e.type="button";e.textContent="ENTER";e.addEventListener("click",submitGuess);r.appendChild(e)}letters.split("").forEach(k=>{const e=document.createElement("button");e.className=`key ${S.keyState[k]||""}`;e.type="button";e.textContent=k.toUpperCase();e.addEventListener("click",()=>typeKey(k));r.appendChild(e)});if(i===2){const d=document.createElement("button");d.className="key wide";d.type="button";d.textContent="⌫";d.addEventListener("click",()=>typeKey("back"));r.appendChild(d)}b.appendChild(r)})}function resetKeyboard(){S.keyState={};S.inputBuffer="";renderKeyboard();renderTypingRow()}function renderTypingRow(){const b=$("#board");if(!b)return;const rows=b.querySelectorAll(".row"),index=Math.min(S.daily?.guesses?.length||0,5),row=rows[index];if(!row)return;row.querySelectorAll(".cell").forEach((c,i)=>{const v=S.inputBuffer[i]||"";if(c.textContent!==v){c.textContent=v;c.classList.remove("typing");if(v){void c.offsetWidth;c.classList.add("typing")}}})}function typeKey(k){if(S.screen!=="game"||S.daily?.ended)return;if(k==="back")S.inputBuffer=S.inputBuffer.slice(0,-1);else if(/^[a-z]$/.test(k)&&S.inputBuffer.length<5){S.inputBuffer+=k;const key=[...document.querySelectorAll("#keyboard .key")].find(x=>x.textContent.toLowerCase()===k);if(key){key.classList.remove("typing");void key.offsetWidth;key.classList.add("typing")}}renderTypingRow()}function applyKeyboard(g,c){if(g&&c)g.split("").forEach((k,i)=>{const n=c[i],o=S.keyState[k];if(n==="green"||(n==="yellow"&&o!=="green")||(n==="gray"&&!o))S.keyState[k]=n});renderKeyboard()}async function startDaily(){try{clearInterval(S.clockInterval);if(S.ws&&S.ws.readyState<2)S.ws.close();S.ws=null;S.mode="daily";S.daily={guesses:[],startedAt:Date.now(),ended:false,result:null,word:null};resetKeyboard();const res=await fetch("/api/daily",{method:"POST",cache:"no-store"});const d=await res.json().catch(()=>({}));if(!res.ok)throw new Error(d.error||`Daily service returned ${res.status}`);S.daily.date=d.date;show("game");dailyHide(true);$("#meName")?.replaceChildren(document.createTextNode("DAILY CHALLENGE"));$("#meAvatar")?.replaceChildren(document.createTextNode("✦"));$("#gameModeLabel")?.replaceChildren(document.createTextNode("TODAY'S WORD"));$("#clock")?.replaceChildren(document.createTextNode("∞"));renderDailyBoard();renderKeyboard();renderTypingRow();applyLayout()}catch(e){console.error(e);toast(e.message||"Could not start today's challenge.")}}async function submitDailyGuess(g){if(!S.daily||S.daily.ended)return;try{const res=await fetch("/api/daily/guess",{method:"POST",headers:{"content-type":"application/json"},cache:"no-store",body:JSON.stringify({guess:g,attempt:S.daily.guesses.length+1})}),d=await res.json().catch(()=>({}));if(!res.ok)return toast(d.error||"Could not check that word.");S.daily.guesses.push({guess:g,colors:d.colors});S.inputBuffer="";applyKeyboard(g,d.colors);renderDailyBoard();renderTypingRow();if(d.correct)return finishDaily("win");if(S.daily.guesses.length>=6)return finishDaily("loss")}catch(e){console.error(e);toast("Could not check that word.")}}async function finishDaily(type){S.daily.ended=true;S.daily.result=type;fetch("/api/daily/complete",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({date:S.daily.date,result:type,guesses:S.daily.guesses.length})}).catch(()=>{});if(type==="win")return showDailyResult(false);$("#lossModal")?.classList.remove("hidden");if(!$("#lossModal"))showDailyResult(false)}function showDailyResult(revealed){show("result");$("#resultIcon")&&($("#resultIcon").textContent=S.daily.result==="win"?"✓":"×");$("#resultTitle")&&($("#resultTitle").textContent=S.daily.result==="win"?"You got it!":"Not this time.");$("#resultText")&&($("#resultText").textContent=S.daily.result==="win"?`Solved in ${S.daily.guesses.length}/6 guesses.`:(revealed&&S.daily.word?`The word was ${S.daily.word.toUpperCase()}.`:"You used all 6 guesses."));$("#playAgain")&&($("#playAgain").textContent="Try Today's Word Again")}async function revealDaily(){try{const res=await fetch("/api/daily/reveal",{cache:"no-store"}),d=await res.json();if(!res.ok)throw new Error(d.error||"Could not reveal the word.");S.daily.word=d.word;$("#lossModal")?.classList.add("hidden");showDailyResult(true)}catch(e){toast(e.message)}}function renderBoardFrom(gs){const b=$("#board");if(!b)return;b.innerHTML="";for(let i=0;i<6;i++){const r=document.createElement("div");r.className="row";const g=gs[i];for(let j=0;j<5;j++){const c=document.createElement("div");c.className="cell";if(g){c.textContent=g.guess[j].toUpperCase();c.classList.add(g.colors[j])}r.appendChild(c)}b.appendChild(r)}}function renderDailyBoard(){const g=S.daily?.guesses||[];renderBoardFrom(g);$("#guessCount")&&($("#guessCount").textContent=`${g.length}/6`)}function send(o){if(S.ws?.readyState===1)S.ws.send(JSON.stringify(o))}function connect(){if(S.ws&&S.ws.readyState<2)S.ws.close();const p=location.protocol==="https:"?"wss":"ws";S.ws=new WebSocket(`${p}://${location.host}/ws/${S.code}/ws?playerId=${encodeURIComponent(S.playerId)}&nickname=${encodeURIComponent(S.nickname)}`);S.ws.onmessage=e=>handle(JSON.parse(e.data));S.ws.onerror=()=>toast("Could not connect to the room.")}function me(){return S.room?.players.find(p=>p.id===S.playerId)}function opp(){return S.room?.players.find(p=>p.id!==S.playerId)}function handle(m){if(m.type==="error")return toast(m.message);if(m.type==="state"){S.room=m.state;if(m.selfId)S.playerId=m.selfId;renderState()}if(m.type==="guessResult")applyKeyboard(m.guess,m.colors)}function renderState(){const r=S.room;if(!r)return;const self=me(),other=opp();if(r.status==="waiting"){show("lobby");$("#roomCodeDisplay")&&($("#roomCodeDisplay").textContent=r.code||S.code);$("#lobbyStatus")&&($("#lobbyStatus").textContent="Waiting for your friend to join…");$("#players")&&($("#players").innerHTML=r.players.map(p=>`<div class="player"><strong>${esc(p.nickname)}</strong><small>${p.ready?"READY ✓":"NOT READY"}</small></div>`).join(""));$("#readyBtn")&&($("#readyBtn").disabled=!!self?.ready);return}if(r.status==="playing"){show("game");dailyHide(false);$("#meName")&&($("#meName").textContent=self?.nickname||S.nickname);$("#oppName")&&($("#oppName").textContent=other?.nickname||"Waiting…");$("#meAvatar")&&($("#meAvatar").textContent=(self?.nickname||"Y")[0].toUpperCase());$("#oppAvatar")&&($("#oppAvatar").textContent=(other?.nickname||"F")[0].toUpperCase());renderBoardFrom(self?.guesses||[]);$("#guessCount")&&($("#guessCount").textContent=`${self?.guesses?.length||0}/6`);$("#oppStats")&&($("#oppStats").innerHTML=other?`<strong>${esc(other.nickname)}</strong><br>${other.guesses.length}/6 guesses`:"Waiting for friend…");$("#gameModeLabel")&&($("#gameModeLabel").textContent="FRIEND DUEL");startClock(r);applyLayout();return}if(r.status==="ended"){show("result");clearInterval(S.clockInterval);renderResult(r,self)}}function startClock(r){clearInterval(S.clockInterval);const t=()=>$("#clock")&&($("#clock").textContent=fmt(r.timer*1000-(Date.now()-r.startedAt)));t();S.clockInterval=setInterval(t,250)}function renderResult(r,p){const type=r.result?.type,win=r.result?.winnerId===p?.id;$("#resultIcon")&&($("#resultIcon").textContent=type==="draw"?"=":win?"✓":"×");$("#resultTitle")&&($("#resultTitle").textContent=type==="draw"?"It's a draw.":win?"You won.":"Game over.");$("#resultText")&&($("#resultText").textContent=r.result?.reason||"Round complete.");$("#playAgain")&&($("#playAgain").textContent="Back Home")}function initTimers(){const g=$("#timerGrid");if(!g)return;g.innerHTML="";[[60,"1 min"],[90,"1.5 min"],[120,"2 min"],[180,"3 min"],[300,"5 min"]].forEach(([s,l])=>{const b=document.createElement("button");b.type="button";b.className=`timer${s===120?" active":""}`;b.textContent=l;b.onclick=()=>{$$(".timer").forEach(x=>x.classList.remove("active"));b.classList.add("active");S.timer=s};g.appendChild(b)})}async function loadHistory(){const b=$("#records");if(!b)return;try{const r=await fetch("/api/history?limit=30",{cache:"no-store"}),d=await r.json();b.innerHTML=d.games?.length?d.games.map(g=>`<div class="record"><strong>${esc(g.room_code||"—")}</strong><span>${esc(g.player_one_name||"—")} vs ${esc(g.player_two_name||"—")}</span><span>${esc(g.result||"—")}</span><span>${esc(g.created_at||"")}</span></div>`).join(""):"<div class=\"empty\">No games recorded yet.</div>"}catch{b.innerHTML="<div class=\"empty\">Could not load records.</div>"}}function submitGuess(){const g=S.inputBuffer.trim().toLowerCase();if(g.length!==5)return toast("Enter exactly 5 letters.");if(S.mode==="daily")return submitDailyGuess(g);send({type:"guess",guess:g});S.inputBuffer="";renderTypingRow()}function wire(){initTimers();updateHomeCountdown();setInterval(updateHomeCountdown,1000);const on=(id,event,fn)=>{const e=$(id);if(e)e.addEventListener(event,fn)};on("playOnline","click",startDaily);on("dailyHome","click",startDaily);on("playFriends","click",()=>show("play"));on("createBtn","click",()=>{S.mode="duel";$("#configEyebrow")&&($("#configEyebrow").textContent="CREATE DUEL");$("#configScreen h2")&&($("#configScreen h2").textContent="Set up your room");$("#startButton")&&($("#startButton").innerHTML="Create Room <b>→</b>");$("#timerGrid")?.classList.remove("hidden");show("config")});on("joinBtn","click",()=>show("join"));const how=()=>$("#howModal")?.classList.remove("hidden");on("homeHow","click",how);on("howBtn","click",how);on("closeHow","click",()=>$("#howModal")?.classList.add("hidden"));on("recordsBtn","click",async()=>{show("records");await loadHistory()});on("configForm","submit",async e=>{e.preventDefault();S.nickname=$("#nickname")?.value.trim()||"";if(!S.nickname)return toast("Enter a nickname.");const r=await fetch("/api/create",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({nickname:S.nickname,timer:S.timer})}),d=await r.json();if(!r.ok)return toast(d.error||"Could not start game.");S.code=d.code;resetKeyboard();connect()});on("joinForm","submit",e=>{e.preventDefault();S.nickname=$("#joinNickname")?.value.trim()||"";S.code=($("#roomCode")?.value||"").trim().toUpperCase();if(!S.nickname||S.code.length!==6)return toast("Enter a nickname and 6-character code.");resetKeyboard();connect()});on("readyBtn","click",()=>send({type:"ready"}));on("playAgain","click",()=>S.mode==="daily"?startDaily():show("home"));on("backHome","click",()=>show("home"));on("layoutToggle","click",()=>{if(!window.matchMedia("(min-width:951px)").matches)return;S.sideLayout=!S.sideLayout;try{localStorage.setItem("wordupLayout",S.sideLayout?"side":"stacked")}catch(e){}applyLayout()});on("copyLink","click",async()=>{if(!S.code)return;try{await navigator.clipboard.writeText(`${location.origin}/?room=${S.code}`);toast("Invite link copied.")}catch{toast("Room code: "+S.code)}});document.addEventListener("keydown",e=>{if(S.screen!=="game")return;if(e.key==="Enter"){e.preventDefault();submitGuess()}else if(e.key==="Backspace"){e.preventDefault();typeKey("back")}else if(/^[a-zA-Z]$/.test(e.key)){e.preventDefault();typeKey(e.key.toLowerCase())}});window.addEventListener("resize",applyLayout);applyLayout()}if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",wire,{once:true});else wire();
+(() => {
+  'use strict';
+
+  const $ = (selector) => document.querySelector(selector);
+  const $$ = (selector) => [...document.querySelectorAll(selector)];
+  const SCREENS = ['home', 'play', 'mode', 'config', 'join', 'lobby', 'game', 'result', 'records'];
+  const KEYS = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
+
+  // Safe bootstrap: storage/crypto must never prevent the application from starting.
+  function getStored(key, fallback = '') {
+    try { return localStorage.getItem(key) ?? fallback; } catch { return fallback; }
+  }
+  function setStored(key, value) {
+    try { localStorage.setItem(key, value); } catch {}
+  }
+  function makePlayerId() {
+    const saved = getStored('wordupPlayerId');
+    if (saved) return saved;
+    try {
+      if (globalThis.crypto?.randomUUID) return crypto.randomUUID();
+    } catch {}
+    return `p_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  }
+
+  const S = {
+    screen: 'home', mode: 'daily', timer: 120, code: null, nickname: '', ws: null, room: null,
+    playerId: makePlayerId(), keyState: {}, inputBuffer: '', daily: null, clockInterval: null,
+    homeInterval: null, sideLayout: getStored('wordupLayout') === 'side', initialized: false
+  };
+  setStored('wordupPlayerId', S.playerId);
+
+  const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+  const fmt = (ms) => {
+    const s = Math.max(0, Math.ceil(ms / 1000));
+    return `${String(Math.floor(s / 3600)).padStart(2, '0')} : ${String(Math.floor((s % 3600) / 60)).padStart(2, '0')} : ${String(s % 60).padStart(2, '0')}`;
+  };
+
+  function show(name) {
+    S.screen = name;
+    SCREENS.forEach((screen) => $(`#${screen}Screen`)?.classList.toggle('active', screen === name));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function toast(message) {
+    const el = $('#toast');
+    if (!el) return;
+    el.textContent = message;
+    el.classList.add('show');
+    clearTimeout(el._timer);
+    el._timer = setTimeout(() => el.classList.remove('show'), 2600);
+  }
+
+  function updateHomeCountdown() {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Africa/Cairo', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+    }).formatToParts(new Date()).reduce((out, part) => (out[part.type] = part.value, out), {});
+    const total = Number(parts.hour) * 3600 + Number(parts.minute) * 60 + Number(parts.second);
+    const left = (86400 - total) % 86400;
+    const el = $('#dailyCountdown');
+    if (el) el.textContent = `${String(Math.floor(left / 3600)).padStart(2, '0')} : ${String(Math.floor((left % 3600) / 60)).padStart(2, '0')} : ${String(left % 60).padStart(2, '0')}`;
+    const sub = document.querySelector('.hero-reset-sub');
+    if (sub) sub.textContent = 'New daily word at Egypt midnight';
+  }
+
+  function dailyHide(on) {
+    [$('#gameScreen .game-top .pill.right'), $('#gameScreen .side.left'), $('#gameScreen .side.right')]
+      .filter(Boolean).forEach((el) => el.classList.toggle('daily-hide', on));
+    $('#gameScreen .game')?.classList.toggle('daily-game', on);
+  }
+
+  function applyLayout() {
+    const game = $('#gameScreen .game');
+    const toggle = $('#layoutToggle');
+    if (!game) return;
+    const desktop = window.matchMedia('(min-width:951px)').matches;
+    game.classList.toggle('layout-side', desktop && S.sideLayout);
+    if (toggle) {
+      toggle.textContent = desktop ? (S.sideLayout ? '▣' : '⌘') : '⌘';
+      toggle.title = desktop ? (S.sideLayout ? 'Use stacked layout' : 'Move keyboard to the right') : 'Desktop layout options';
+    }
+  }
+
+  function renderKeyboard() {
+    const board = $('#keyboard');
+    if (!board) return;
+    board.innerHTML = '';
+    KEYS.forEach((letters, rowIndex) => {
+      const row = document.createElement('div');
+      row.className = 'key-row';
+      if (rowIndex === 2) row.appendChild(makeKey('ENTER', 'wide', submitGuess));
+      for (const letter of letters) row.appendChild(makeKey(letter.toUpperCase(), S.keyState[letter] || '', () => typeKey(letter)));
+      if (rowIndex === 2) row.appendChild(makeKey('⌫', 'wide', () => typeKey('back')));
+      board.appendChild(row);
+    });
+  }
+
+  function makeKey(label, state, action) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `key ${state}`.trim();
+    button.textContent = label;
+    button.addEventListener('click', action);
+    return button;
+  }
+
+  function resetKeyboard() {
+    S.keyState = {};
+    S.inputBuffer = '';
+    renderKeyboard();
+    renderTypingRow();
+  }
+
+  function renderTypingRow() {
+    const board = $('#board');
+    if (!board) return;
+    const rows = board.querySelectorAll('.row');
+    const index = Math.min(S.daily?.guesses?.length || 0, 5);
+    const row = rows[index];
+    if (!row) return;
+    row.querySelectorAll('.cell').forEach((cell, i) => {
+      const value = S.inputBuffer[i] || '';
+      if (cell.textContent !== value) {
+        cell.textContent = value;
+        cell.classList.remove('typing');
+        if (value) { void cell.offsetWidth; cell.classList.add('typing'); }
+      }
+    });
+  }
+
+  function typeKey(key) {
+    if (S.screen !== 'game' || S.daily?.ended) return;
+    if (key === 'back') S.inputBuffer = S.inputBuffer.slice(0, -1);
+    else if (/^[a-z]$/.test(key) && S.inputBuffer.length < 5) {
+      S.inputBuffer += key;
+      const button = [...document.querySelectorAll('#keyboard .key')].find((el) => el.textContent.toLowerCase() === key);
+      if (button) { button.classList.remove('typing'); void button.offsetWidth; button.classList.add('typing'); }
+    }
+    renderTypingRow();
+  }
+
+  function applyKeyboard(guess, colors) {
+    if (guess && colors) guess.split('').forEach((letter, index) => {
+      const next = colors[index];
+      const current = S.keyState[letter];
+      if (next === 'green' || (next === 'yellow' && current !== 'green') || (next === 'gray' && !current)) S.keyState[letter] = next;
+    });
+    renderKeyboard();
+  }
+
+  async function api(path, options = {}) {
+    const response = await fetch(path, { cache: 'no-store', ...options });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`);
+    return data;
+  }
+
+  async function startDaily() {
+    try {
+      clearInterval(S.clockInterval);
+      if (S.ws && S.ws.readyState < 2) S.ws.close();
+      S.ws = null;
+      S.mode = 'daily';
+      S.daily = { guesses: [], startedAt: Date.now(), ended: false, result: null, word: null, date: null };
+      resetKeyboard();
+      const data = await api('/api/daily', { method: 'POST' });
+      S.daily.date = data.date;
+      show('game');
+      dailyHide(true);
+      $('#meName')?.replaceChildren(document.createTextNode('DAILY CHALLENGE'));
+      $('#meAvatar')?.replaceChildren(document.createTextNode('✦'));
+      $('#gameModeLabel')?.replaceChildren(document.createTextNode("TODAY'S WORD"));
+      $('#clock')?.replaceChildren(document.createTextNode('∞'));
+      renderDailyBoard();
+      renderKeyboard();
+      renderTypingRow();
+      applyLayout();
+    } catch (error) {
+      console.error('[WordUp] Daily start failed:', error);
+      toast(error.message || "Couldn't start today's challenge.");
+    }
+  }
+
+  async function submitDailyGuess(guess) {
+    if (!S.daily || S.daily.ended) return;
+    try {
+      const data = await api('/api/daily/guess', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ guess, attempt: S.daily.guesses.length + 1 })
+      });
+      S.daily.guesses.push({ guess, colors: data.colors });
+      S.inputBuffer = '';
+      applyKeyboard(guess, data.colors);
+      renderDailyBoard();
+      renderTypingRow();
+      if (data.correct) return finishDaily('win');
+      if (S.daily.guesses.length >= 6) return finishDaily('loss');
+    } catch (error) {
+      console.error('[WordUp] Daily guess failed:', error);
+      toast(error.message || 'Could not check that word.');
+    }
+  }
+
+  function ensureLossModal() {
+    let modal = $('#lossModal');
+    if (modal) return modal;
+    modal = document.createElement('div');
+    modal.id = 'lossModal';
+    modal.className = 'modal hidden';
+    modal.innerHTML = `<div class="modal-card"><div class="eyebrow">ROUND COMPLETE</div><h2>Want to see the word? 😉</h2><div class="result-actions"><button id="revealDaily" class="primary" type="button">Reveal</button><button id="keepHidden" class="secondary" type="button">Keep Hidden</button></div></div>`;
+    document.body.appendChild(modal);
+    $('#revealDaily')?.addEventListener('click', revealDaily);
+    $('#keepHidden')?.addEventListener('click', () => { modal.classList.add('hidden'); showDailyResult(false); });
+    return modal;
+  }
+
+  function finishDaily(result) {
+    if (!S.daily) return;
+    S.daily.ended = true;
+    S.daily.result = result;
+    fetch('/api/daily/complete', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ date: S.daily.date, result, guesses: S.daily.guesses.length })
+    }).catch(() => {});
+    if (result === 'win') return showDailyResult(false);
+    ensureLossModal().classList.remove('hidden');
+  }
+
+  function showDailyResult(revealed) {
+    show('result');
+    if ($('#resultIcon')) $('#resultIcon').textContent = S.daily?.result === 'win' ? '✓' : '×';
+    if ($('#resultTitle')) $('#resultTitle').textContent = S.daily?.result === 'win' ? 'You got it!' : 'Not this time.';
+    if ($('#resultText')) $('#resultText').textContent = S.daily?.result === 'win'
+      ? `Solved in ${S.daily.guesses.length}/6 guesses.`
+      : (revealed && S.daily.word ? `The word was ${S.daily.word.toUpperCase()}.` : 'You used all 6 guesses.');
+    if ($('#playAgain')) $('#playAgain').textContent = "Try Today's Word Again";
+  }
+
+  async function revealDaily() {
+    try {
+      const data = await api('/api/daily/reveal');
+      S.daily.word = data.word;
+      $('#lossModal')?.classList.add('hidden');
+      showDailyResult(true);
+    } catch (error) { toast(error.message || 'Could not reveal the word.'); }
+  }
+
+  function renderBoardFrom(guesses) {
+    const board = $('#board');
+    if (!board) return;
+    board.innerHTML = '';
+    for (let rowIndex = 0; rowIndex < 6; rowIndex++) {
+      const row = document.createElement('div'); row.className = 'row';
+      const guess = guesses[rowIndex];
+      for (let i = 0; i < 5; i++) {
+        const cell = document.createElement('div'); cell.className = 'cell';
+        if (guess) { cell.textContent = guess.guess[i].toUpperCase(); cell.classList.add(guess.colors[i]); }
+        row.appendChild(cell);
+      }
+      board.appendChild(row);
+    }
+  }
+  function renderDailyBoard() {
+    const guesses = S.daily?.guesses || [];
+    renderBoardFrom(guesses);
+    if ($('#guessCount')) $('#guessCount').textContent = `${guesses.length}/6`;
+  }
+
+  // Multiplayer
+  function send(message) { if (S.ws?.readyState === 1) S.ws.send(JSON.stringify(message)); }
+  function connect() {
+    if (S.ws && S.ws.readyState < 2) S.ws.close();
+    const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+    S.ws = new WebSocket(`${protocol}://${location.host}/ws/${S.code}/ws?playerId=${encodeURIComponent(S.playerId)}&nickname=${encodeURIComponent(S.nickname)}`);
+    S.ws.onmessage = (event) => { try { handle(JSON.parse(event.data)); } catch { toast('Invalid room response.'); } };
+    S.ws.onerror = () => toast('Could not connect to the room.');
+  }
+  function me() { return S.room?.players.find((player) => player.id === S.playerId); }
+  function opp() { return S.room?.players.find((player) => player.id !== S.playerId); }
+  function handle(message) {
+    if (message.type === 'error') return toast(message.message);
+    if (message.type === 'state') { S.room = message.state; if (message.selfId) { S.playerId = message.selfId; setStored('wordupPlayerId', S.playerId); } renderState(); }
+    if (message.type === 'guessResult') applyKeyboard(message.guess, message.colors);
+  }
+  function renderState() {
+    const room = S.room; if (!room) return;
+    const self = me(), other = opp();
+    if (room.status === 'waiting') {
+      show('lobby');
+      if ($('#roomCodeDisplay')) $('#roomCodeDisplay').textContent = room.code || S.code;
+      if ($('#lobbyStatus')) $('#lobbyStatus').textContent = 'Waiting for your friend to join…';
+      if ($('#players')) $('#players').innerHTML = room.players.map((p) => `<div class="player"><strong>${esc(p.nickname)}</strong><small>${p.ready ? 'READY ✓' : 'NOT READY'}</small></div>`).join('');
+      if ($('#readyBtn')) $('#readyBtn').disabled = !!self?.ready;
+      return;
+    }
+    if (room.status === 'playing') {
+      show('game'); dailyHide(false);
+      if ($('#meName')) $('#meName').textContent = self?.nickname || S.nickname;
+      if ($('#oppName')) $('#oppName').textContent = other?.nickname || 'Waiting…';
+      if ($('#meAvatar')) $('#meAvatar').textContent = (self?.nickname || 'Y')[0].toUpperCase();
+      if ($('#oppAvatar')) $('#oppAvatar').textContent = (other?.nickname || 'F')[0].toUpperCase();
+      renderBoardFrom(self?.guesses || []);
+      if ($('#guessCount')) $('#guessCount').textContent = `${self?.guesses?.length || 0}/6`;
+      if ($('#oppStats')) $('#oppStats').innerHTML = other ? `<strong>${esc(other.nickname)}</strong><br>${other.guesses.length}/6 guesses` : 'Waiting for friend…';
+      if ($('#gameModeLabel')) $('#gameModeLabel').textContent = 'FRIEND DUEL';
+      startClock(room); applyLayout(); return;
+    }
+    if (room.status === 'ended') { show('result'); clearInterval(S.clockInterval); renderResult(room, self); }
+  }
+  function startClock(room) {
+    clearInterval(S.clockInterval);
+    const tick = () => { if ($('#clock')) $('#clock').textContent = fmt(room.timer * 1000 - (Date.now() - room.startedAt)); };
+    tick(); S.clockInterval = setInterval(tick, 250);
+  }
+  function renderResult(room, player) {
+    const type = room.result?.type, win = room.result?.winnerId === player?.id;
+    if ($('#resultIcon')) $('#resultIcon').textContent = type === 'draw' ? '=' : win ? '✓' : '×';
+    if ($('#resultTitle')) $('#resultTitle').textContent = type === 'draw' ? "It's a draw." : win ? 'You won.' : 'Game over.';
+    if ($('#resultText')) $('#resultText').textContent = room.result?.reason || 'Round complete.';
+    if ($('#playAgain')) $('#playAgain').textContent = 'Back Home';
+  }
+
+  function initTimers() {
+    const grid = $('#timerGrid'); if (!grid) return;
+    grid.innerHTML = '';
+    [[60,'1 min'], [90,'1.5 min'], [120,'2 min'], [180,'3 min'], [300,'5 min']].forEach(([seconds, label]) => {
+      const button = document.createElement('button'); button.type = 'button'; button.className = `timer${seconds === 120 ? ' active' : ''}`; button.textContent = label;
+      button.addEventListener('click', () => { $$('.timer').forEach((el) => el.classList.remove('active')); button.classList.add('active'); S.timer = seconds; });
+      grid.appendChild(button);
+    });
+  }
+
+  async function loadHistory() {
+    const board = $('#records'); if (!board) return;
+    try {
+      const data = await api('/api/history?limit=30');
+      board.innerHTML = data.games?.length ? data.games.map((game) => `<div class="record"><strong>${esc(game.room_code || '—')}</strong><span>${esc(game.player_one_name || '—')} vs ${esc(game.player_two_name || '—')}</span><span>${esc(game.result || '—')}</span><span>${esc(game.created_at || '')}</span></div>`).join('') : '<div class="empty">No games recorded yet.</div>';
+    } catch { board.innerHTML = '<div class="empty">Could not load records.</div>'; }
+  }
+
+  function submitGuess() {
+    const guess = S.inputBuffer.trim().toLowerCase();
+    if (guess.length !== 5) return toast('Enter exactly 5 letters.');
+    if (S.mode === 'daily') return submitDailyGuess(guess);
+    send({ type: 'guess', guess }); S.inputBuffer = ''; renderTypingRow();
+  }
+
+  function goBack(target) { show(target || 'home'); }
+
+  function wire() {
+    if (S.initialized) return;
+    S.initialized = true;
+
+    initTimers();
+    updateHomeCountdown();
+    S.homeInterval = setInterval(updateHomeCountdown, 1000);
+
+    const on = (id, event, handler) => { const el = $(`#${id}`); if (el) el.addEventListener(event, handler); };
+
+    // Daily buttons deliberately point to the same single controller.
+    on('playOnline', 'click', startDaily);
+    on('dailyHome', 'click', startDaily);
+
+    on('playFriends', 'click', () => show('play'));
+    on('createBtn', 'click', () => {
+      S.mode = 'duel';
+      if ($('#configEyebrow')) $('#configEyebrow').textContent = 'CREATE DUEL';
+      if ($('#configScreen h2')) $('#configScreen h2').textContent = 'Set up your room';
+      if ($('#startButton')) $('#startButton').innerHTML = 'Create Room <b>→</b>';
+      $('#timerGrid')?.classList.remove('hidden');
+      show('config');
+    });
+    on('joinBtn', 'click', () => show('join'));
+    on('howBtn', 'click', () => $('#howModal')?.classList.remove('hidden'));
+    on('homeHow', 'click', () => $('#howModal')?.classList.remove('hidden'));
+    on('closeHow', 'click', () => $('#howModal')?.classList.add('hidden'));
+    on('recordsBtn', 'click', async () => { show('records'); await loadHistory(); });
+
+    on('configForm', 'submit', async (event) => {
+      event.preventDefault();
+      S.nickname = $('#nickname')?.value.trim() || '';
+      if (!S.nickname) return toast('Enter a nickname.');
+      try {
+        const data = await api('/api/create', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ nickname: S.nickname, timer: S.timer }) });
+        S.code = data.code; resetKeyboard(); connect();
+      } catch (error) { toast(error.message || 'Could not start game.'); }
+    });
+
+    on('joinForm', 'submit', (event) => {
+      event.preventDefault();
+      S.nickname = $('#joinNickname')?.value.trim() || '';
+      S.code = ($('#roomCode')?.value || '').trim().toUpperCase();
+      if (!S.nickname || S.code.length !== 6) return toast('Enter a nickname and 6-character code.');
+      resetKeyboard(); connect();
+    });
+
+    on('readyBtn', 'click', () => send({ type: 'ready' }));
+    on('playAgain', 'click', () => S.mode === 'daily' ? startDaily() : show('home'));
+    on('backHome', 'click', () => show('home'));
+    on('layoutToggle', 'click', () => {
+      if (!window.matchMedia('(min-width:951px)').matches) return;
+      S.sideLayout = !S.sideLayout;
+      setStored('wordupLayout', S.sideLayout ? 'side' : 'stacked');
+      applyLayout();
+    });
+    on('copyLink', 'click', async () => {
+      if (!S.code) return;
+      try { await navigator.clipboard.writeText(`${location.origin}/?room=${S.code}`); toast('Invite link copied.'); }
+      catch { toast(`Room code: ${S.code}`); }
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (S.screen !== 'game') return;
+      if (event.key === 'Enter') { event.preventDefault(); submitGuess(); }
+      else if (event.key === 'Backspace') { event.preventDefault(); typeKey('back'); }
+      else if (/^[a-zA-Z]$/.test(event.key)) { event.preventDefault(); typeKey(event.key.toLowerCase()); }
+    });
+
+    $$('.back[data-back]').forEach((button) => button.addEventListener('click', () => goBack(button.dataset.back)));
+    window.addEventListener('resize', applyLayout);
+    applyLayout();
+    console.info('[WordUp] Frontend initialized successfully.');
+  }
+
+  // Always bootstrap after the DOM exists. A failed storage/ID operation cannot stop this.
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire, { once: true });
+  else wire();
+
+  // Small diagnostic surface for future maintenance without exposing mutable state.
+  globalThis.WordUp = Object.freeze({ startDaily, show, version: '2026-09-18-stable' });
+})();
