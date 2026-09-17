@@ -2,6 +2,8 @@ import { DurableObject } from "cloudflare:workers";
 
 const WORDS=["apple","brick","cloud","dream","flame","grape","heart","lemon","ocean","plant","river","sugar","tiger","train","water","world","chair","house","light","music","paper","smile","stone","table","green","party","quick","sleep","sound","beach"];
 const TIMER_OPTIONS=[60,90,120,180,300];
+const DICTIONARY_URL="https://raw.githubusercontent.com/darkermango/5-Letter-words/main/words.txt";
+let dictionaryPromise=null;
 const json=(d,s=200)=>new Response(JSON.stringify(d),{status:s,headers:{"content-type":"application/json","cache-control":"no-store"}});
 const nick=v=>String(v||"").trim().replace(/\s+/g," ").slice(0,18);
 const word=v=>String(v||"").trim().toLowerCase().replace(/[^a-z]/g,"").slice(0,5);
@@ -11,6 +13,14 @@ const daily=()=>{const day=cairoDate();let h=0;for(const c of day)h=(h*31+c.char
 const randomWord=()=>WORDS[Math.floor(Math.random()*WORDS.length)];
 function score(w,g){const a=Array(5).fill("gray"),r={};for(let i=0;i<5;i++){if(g[i]===w[i])a[i]="green";else r[w[i]]=(r[w[i]]||0)+1}for(let i=0;i<5;i++)if(a[i]==="gray"&&r[g[i]]>0){a[i]="yellow";r[g[i]]--}return a}
 const attempt=(w,g)=>({guess:g,colors:score(w,g)});
+async function isRealWord(g){
+ if(WORDS.includes(g))return true;
+ if(!dictionaryPromise){
+  dictionaryPromise=fetch(DICTIONARY_URL,{cf:{cacheTtl:86400,cacheEverything:true}}).then(async r=>{if(!r.ok)throw new Error("dictionary unavailable");const text=await r.text();return new Set(text.split(/\r?\n/).map(x=>x.trim().toLowerCase()).filter(x=>/^[a-z]{5}$/.test(x))) }).catch(()=>null);
+ }
+ const set=await dictionaryPromise;
+ return !!set?.has(g);
+}
 
 export class GameRoom extends DurableObject{
  constructor(ctx,env){super(ctx,env);this.env=env}
@@ -59,6 +69,7 @@ export default{async fetch(req,env){const u=new URL(req.url);
   const b=await req.json().catch(()=>({})),g=word(b.guess),attemptNo=Number(b.attempt)||0;
   if(g.length!==5)return json({error:"Enter exactly 5 letters."},400);
   if(attemptNo<1||attemptNo>6)return json({error:"You have used all 6 guesses."},400);
+  if(!await isRealWord(g))return json({error:"That is not a real word."},400);
   return json({ok:true,correct:g===daily(),colors:score(daily(),g)});
  }
  if(u.pathname==="/api/daily/reveal"&&req.method==="GET")return json({ok:true,word:daily()});
