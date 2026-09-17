@@ -1,0 +1,5 @@
+{
+  "name":"wordup","private":true,"version":"1.0.0",
+  "scripts":{"dev":"wrangler dev","deploy":"wrangler deploy","db:migrate":"wrangler d1 migrations apply WORDUP_DB --remote"},
+  "devDependencies":{"wrangler":"^4.39.0"}
+}
