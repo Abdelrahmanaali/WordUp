@@ -6,8 +6,8 @@ const json=(d,s=200)=>new Response(JSON.stringify(d),{status:s,headers:{"content
 const nick=v=>String(v||"").trim().replace(/\s+/g," ").slice(0,18);
 const word=v=>String(v||"").trim().toLowerCase().replace(/[^a-z]/g,"").slice(0,5);
 const code=()=>{const c="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";return Array.from({length:6},()=>c[Math.floor(Math.random()*c.length)]).join("")};
-const utcDate=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"UTC"}).format(new Date());
-const daily=()=>{const day=utcDate();let h=0;for(const c of day)h=(h*31+c.charCodeAt(0))>>>0;return WORDS[h%WORDS.length]};
+const cairoDate=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo"}).format(new Date());
+const daily=()=>{const day=cairoDate();let h=0;for(const c of day)h=(h*31+c.charCodeAt(0))>>>0;return WORDS[h%WORDS.length]};
 const randomWord=()=>WORDS[Math.floor(Math.random()*WORDS.length)];
 function score(w,g){const a=Array(5).fill("gray"),r={};for(let i=0;i<5;i++){if(g[i]===w[i])a[i]="green";else r[w[i]]=(r[w[i]]||0)+1}for(let i=0;i<5;i++)if(a[i]==="gray"&&r[g[i]]>0){a[i]="yellow";r[g[i]]--}return a}
 const attempt=(w,g)=>({guess:g,colors:score(w,g)});
@@ -54,7 +54,7 @@ export class GameRoom extends DurableObject{
 }
 
 export default{async fetch(req,env){const u=new URL(req.url);
- if(u.pathname==="/api/daily"&&req.method==="POST")return json({ok:true,date:utcDate()});
+ if(u.pathname==="/api/daily"&&req.method==="POST")return json({ok:true,date:cairoDate()});
  if(u.pathname==="/api/daily/guess"&&req.method==="POST"){
   const b=await req.json().catch(()=>({})),g=word(b.guess),attemptNo=Number(b.attempt)||0;
   if(g.length!==5)return json({error:"Enter exactly 5 letters."},400);
