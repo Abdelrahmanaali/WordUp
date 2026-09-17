@@ -1,4 +1,4 @@
-/* WordUp game layout v2: true two-panel desktop game */
+/* WordUp game layout v3: true two-panel desktop game + controlled reveal */
 .game.daily-layout,.game.layout-side{
   width:min(1120px,94vw)!important;
   max-width:none!important;
@@ -17,9 +17,25 @@
 .game.daily-layout .key,.game.layout-side .key{height:54px!important}
 .game.daily-layout .game-meta,.game.layout-side .game-meta{width:min(100%,430px)!important}
 .game.daily-layout .side,.game.layout-side .side{display:none!important}
+
+/* The evaluated color is deliberately hidden until the card reaches the
+   midpoint of the flip. This prevents green/yellow/gray from appearing early. */
 .cell.reveal{transform-style:preserve-3d;backface-visibility:hidden;will-change:transform}
-.cell.reveal.green,.cell.reveal.yellow,.cell.reveal.gray{animation:wordupFlip .58s cubic-bezier(.2,.75,.2,1) both}
-@keyframes wordupFlip{0%{transform:perspective(500px) rotateX(0deg);filter:brightness(1)}42%{transform:perspective(500px) rotateX(90deg);filter:brightness(1.35)}58%{transform:perspective(500px) rotateX(90deg);filter:brightness(1.35)}100%{transform:perspective(500px) rotateX(0deg);filter:brightness(1)}}
-@media(prefers-reduced-motion:reduce){.cell.reveal{animation:none!important}}
+.cell.reveal-hidden.green,.cell.reveal-hidden.yellow,.cell.reveal-hidden.gray{
+  background:var(--cell-bg,#151c29)!important;
+  color:transparent!important;
+  border-color:#28344a!important;
+}
+.cell.reveal.green,.cell.reveal.yellow,.cell.reveal.gray{
+  animation:wordupFlip .72s cubic-bezier(.22,.72,.18,1) both;
+}
+@keyframes wordupFlip{
+  0%{transform:perspective(600px) rotateX(0deg);filter:brightness(1)}
+  44%{transform:perspective(600px) rotateX(90deg);filter:brightness(1.18)}
+  50%{transform:perspective(600px) rotateX(90deg);filter:brightness(1.3)}
+  56%{transform:perspective(600px) rotateX(90deg);filter:brightness(1.18)}
+  100%{transform:perspective(600px) rotateX(0deg);filter:brightness(1)}
+}
+@media(prefers-reduced-motion:reduce){.cell.reveal{animation:none!important}.cell.reveal-hidden.green,.cell.reveal-hidden.yellow,.cell.reveal-hidden.gray{background:inherit!important;color:inherit!important;border-color:inherit!important}}
 @media(max-width:950px){.game.daily-layout,.game.layout-side{width:min(520px,94vw)!important;display:block!important}.game.daily-layout .board-panel,.game.layout-side .board-panel{width:100%!important}.game.daily-layout .keyboard-panel,.game.layout-side .keyboard-panel{margin-top:22px!important;padding:18px!important}.game.daily-layout .board,.game.layout-side .board{width:min(100%,390px)!important}}
 @media(max-width:600px){.game.daily-layout,.game.layout-side{width:100%!important}.game.daily-layout .keyboard-panel,.game.layout-side .keyboard-panel{padding:12px!important;border-radius:20px!important}.game.daily-layout .key,.game.layout-side .key{height:48px!important}}
