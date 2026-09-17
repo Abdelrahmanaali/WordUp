@@ -1,6 +1,10 @@
 (() => {
   'use strict';
 
+  const REVEAL_DURATION = 720;
+  const REVEAL_STAGGER = 170;
+  const COLOR_REVEAL_AT = 360;
+
   function animateLatestGuess() {
     const board = document.querySelector('#board');
     if (!board) return;
@@ -20,10 +24,22 @@
     cells.forEach((cell, index) => {
       const color = cell.classList.contains('green') ? 'green' : cell.classList.contains('yellow') ? 'yellow' : cell.classList.contains('gray') ? 'gray' : '';
       if (!color) return;
-      cell.classList.remove('reveal');
+
+      const delay = index * REVEAL_STAGGER;
+      const colorDelay = delay + COLOR_REVEAL_AT;
+
+      cell.classList.remove('reveal', 'reveal-hidden');
+      cell.style.animationDelay = `${delay}ms`;
+
+      // Hide the evaluated color before the first paint. The color is released
+      // at the exact midpoint of the flip, like the classic Wordle reveal.
+      cell.classList.add('reveal-hidden');
       void cell.offsetWidth;
-      cell.style.animationDelay = `${index * 120}ms`;
       cell.classList.add('reveal');
+
+      window.setTimeout(() => {
+        cell.classList.remove('reveal-hidden');
+      }, colorDelay);
     });
   }
 
