@@ -2,7 +2,7 @@
   'use strict';
 
   const REVEAL_DURATION = 720;
-  const REVEAL_STAGGER = 170;
+  const COLOR_REVEAL_STAGGER = 170;
   const COLOR_REVEAL_AT = 360;
 
   function animateLatestGuess() {
@@ -21,25 +21,30 @@
     if (row.dataset.revealSignature === signature) return;
     row.dataset.revealSignature = signature;
 
+    // All five cards start their flip together. Their evaluated colors are
+    // hidden first, then revealed one-by-one while the cards are edge-on.
+    cells.forEach(cell => {
+      const color = cell.classList.contains('green') ? 'green' : cell.classList.contains('yellow') ? 'yellow' : cell.classList.contains('gray') ? 'gray' : '';
+      if (!color) return;
+
+      cell.classList.remove('reveal', 'reveal-hidden');
+      cell.style.animationDelay = '0ms';
+      cell.classList.add('reveal-hidden');
+    });
+
+    void row.offsetWidth;
+
     cells.forEach((cell, index) => {
       const color = cell.classList.contains('green') ? 'green' : cell.classList.contains('yellow') ? 'yellow' : cell.classList.contains('gray') ? 'gray' : '';
       if (!color) return;
 
-      const delay = index * REVEAL_STAGGER;
-      const colorDelay = delay + COLOR_REVEAL_AT;
-
-      cell.classList.remove('reveal', 'reveal-hidden');
-      cell.style.animationDelay = `${delay}ms`;
-
-      // Hide the evaluated color before the first paint. The color is released
-      // at the exact midpoint of the flip, like the classic Wordle reveal.
-      cell.classList.add('reveal-hidden');
-      void cell.offsetWidth;
       cell.classList.add('reveal');
 
+      // The cards flip together. At the midpoint, reveal the evaluated
+      // result in sequence: first tile, then second, then third, etc.
       window.setTimeout(() => {
         cell.classList.remove('reveal-hidden');
-      }, colorDelay);
+      }, COLOR_REVEAL_AT + index * COLOR_REVEAL_STAGGER);
     });
   }
 
