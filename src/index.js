@@ -32,7 +32,7 @@ export class GameRoom extends DurableObject{
  public(s){return{code:s.code,mode:s.mode,timer:s.timer,status:s.status,startedAt:s.startedAt,endedAt:s.endedAt,players:s.players.map(p=>({id:p.id,nickname:p.nickname,ready:p.ready,connected:p.connected,guesses:p.guesses.map(g=>attempt(s.word,g.guess))})),result:s.result?{winnerId:s.result.winnerId,winnerName:s.result.winnerName,type:s.result.type,word:s.word,reason:s.result.reason}:null}}
  async fetch(req){
   const u=new URL(req.url),s=await this.load();
-  if(u.pathname.endsWith("/ws")){
+  if(req.headers.get("Upgrade")==="websocket"){
    if(req.headers.get("Upgrade")!=="websocket")return new Response("WebSocket required",{status:426});
    const pid=u.searchParams.get("playerId"),name=nick(u.searchParams.get("nickname"));if(!pid||!name)return new Response("Missing player information",{status:400});
    let p=s.players.find(x=>x.id===pid);
