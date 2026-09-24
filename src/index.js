@@ -1,4 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
+import { WordSearchRoom } from "./word-search-room.js";
 
 const WORDS=["apple","brick","cloud","dream","flame","grape","heart","lemon","ocean","plant","river","sugar","tiger","train","water","world","chair","house","light","music","paper","smile","stone","table","green","party","quick","sleep","sound","beach"];
 const TIMER_OPTIONS=[60,90,120,180,300];
@@ -76,6 +77,8 @@ export default{async fetch(req,env){const u=new URL(req.url);
  if(u.pathname==="/api/daily/complete"&&req.method==="POST")return json({ok:true});
  if(u.pathname==="/api/create"&&req.method==="POST"){const b=await req.json().catch(()=>({})),name=nick(b.nickname);if(!name)return json({error:"Nickname is required."},400);const c=code(),stub=env.GAME_ROOMS.getByName(c);const r=await stub.fetch(new Request("https://room/init",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({code:c,mode:"duel",timer:b.timer})}));if(!r.ok)return json({error:"Could not create room."},500);return json({ok:true,code:c})}
  if(u.pathname==="/api/history"){if(!env.WORDUP_DB)return json({games:[]});const n=Math.min(+u.searchParams.get("limit")||30,100);const r=await env.WORDUP_DB.prepare("SELECT room_code,mode,player_one_name,player_two_name,winner_name,result,timer_seconds,duration_seconds,created_at FROM games ORDER BY id DESC LIMIT ?").bind(n).all();return json({games:r.results||[]})}
+ if(u.pathname==="/api/search/create"&&req.method==="POST"){const b=await req.json().catch(()=>({})),name=nick(b.nickname);if(!name)return json({error:"Nickname is required."},400);const c=code(),stub=env.SEARCH_ROOMS.getByName(c);const r=await stub.fetch(new Request("https://room/init",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({code:c})}));if(!r.ok)return json({error:"Could not create room."},500);return json({ok:true,code:c})}
+ if(u.pathname.startsWith("/ws-search/")){const c=u.pathname.split("/")[2]?.toUpperCase();if(!c)return new Response("Missing room code",{status:400});return env.SEARCH_ROOMS.getByName(c).fetch(req)}
  if(u.pathname.startsWith("/ws/")){const c=u.pathname.split("/")[2]?.toUpperCase();if(!c)return new Response("Missing room code",{status:400});return env.GAME_ROOMS.getByName(c).fetch(req)}
  return env.ASSETS.fetch(req)
 }}
