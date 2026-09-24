@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { WordSearchRoom } from "./word-search-room.js";
+export { WordSearchRoom } from "./word-search-room.js";
 
 const WORDS=["apple","brick","cloud","dream","flame","grape","heart","lemon","ocean","plant","river","sugar","tiger","train","water","world","chair","house","light","music","paper","smile","stone","table","green","party","quick","sleep","sound","beach"];
 const TIMER_OPTIONS=[60,90,120,180,300];
