@@ -1,1 +1,85 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>WordUp — Word Search</title><link rel="stylesheet" href="/word-search.css"></head><body><header><a href="/" class="brand">W<span>WordUp</span></a><a href="/" class="back">← WordUp</a></header><main><section id="lobby" class="screen"><div class="eyebrow">WORD SEARCH · WITH FRIENDS</div><h1>Find words.<br><em>Beat your friends.</em></h1><p class="sub">Create a room, share the code, and race through the same puzzle in real time.</p><div class="panel"><label>Nickname<input id="name" maxlength="18" placeholder="Your nickname"></label><div class="actions"><button id="create" class="primary">Create Game →</button><button id="join" class="secondary">Join with Code ↗</button></div><div id="joinBox" class="hidden"><label>Room code<input id="code" maxlength="6" placeholder="ABC123"></label><button id="joinRoom" class="primary full">Join Room</button></div></div></section><section id="room" class="screen hidden"><div class="roomHead"><div><div class="eyebrow">ROOM CODE</div><h2 id="roomCode">------</h2></div><button id="copy" class="secondary">Copy invite link</button></div><div class="panel"><div id="players"></div><button id="ready" class="primary full">I'm Ready ✓</button><p class="hint">Both players must be ready.</p></div></section><section id="game" class="screen hidden"><div class="gameHead"><div><div class="eyebrow">WORD SEARCH</div><h2 id="category">Classic</h2></div><div id="timer" class="timer">02:00</div></div><div class="gameGrid"><div class="panel boardWrap"><div id="grid" class="grid"></div></div><aside class="panel words"><div class="eyebrow">WORDS</div><div id="wordList"></div></aside></div><div id="score" class="score"></div></section><section id="finish" class="screen hidden"><div class="panel finish"><div class="eyebrow">MATCH COMPLETE</div><h1 id="winner"></h1><p id="finishText"></p><button class="primary" onclick="location.reload()">Play Again →</button></div></section></main><div id="toast"></div><script src="/word-search.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#080b12">
+<title>WordUp — Word Search</title>
+<link rel="stylesheet" href="/word-search.css?v=20260924-1">
+</head>
+<body>
+<header><a class="brand" href="/">W<span>WordUp</span></a><a class="back" href="/">← WordUp</a></header>
+<main>
+<section id="setup" class="screen">
+  <div class="eyebrow">WORD SEARCH · SOLO</div>
+  <h1>Find the hidden<br><em>words.</em></h1>
+  <p class="sub">Choose your puzzle, set the clock, and race the board. Play alone or add an AI challenger.</p>
+  <div class="setup-grid">
+    <div class="panel">
+      <label>Nickname<input id="nickname" maxlength="18" autocomplete="nickname" placeholder="Your nickname"></label>
+      <div class="two">
+        <label>Category<select id="category">
+          <option value="Education">Education & Science</option><option value="Technology">Technology & Coding</option>
+          <option value="Food">Food & Cooking</option><option value="Movies">Movies & Pop Culture</option>
+          <option value="Nature">Nature & Wildlife</option><option value="Geography">World Geography</option>
+          <option value="Sports">Sports & Games</option><option value="Anime">Anime & Gaming</option>
+          <option value="Custom">Custom Words</option>
+        </select></label>
+        <label>Grid size<select id="gridSize">
+          <option value="10">10 × 10</option><option value="11">11 × 11</option><option value="12" selected>12 × 12</option>
+          <option value="13">13 × 13</option><option value="14">14 × 14</option><option value="15">15 × 15</option>
+        </select></label>
+      </div>
+      <div class="two">
+        <label>Time<select id="time"><option value="60">1 minute</option><option value="120">2 minutes</option><option value="180" selected>3 minutes</option><option value="300">5 minutes</option></select></label>
+        <label class="check-label"><span>AI challenger</span><button type="button" id="aiToggle" class="toggle" aria-pressed="false"><i></i></button></label>
+      </div>
+      <div id="aiOptions" class="ai-options hidden">
+        <label>AI difficulty<select id="difficulty"><option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Hard</option><option value="grandmaster">Grandmaster</option></select></label>
+      </div>
+      <div id="customWrap" class="hidden"><label>Custom words<input id="customWords" maxlength="1000" placeholder="apple, bridge, cloud, river..."><small>Use commas or spaces. Words longer than the grid are skipped.</small></label></div>
+      <button id="start" class="primary full">Start Word Search <b>→</b></button>
+      <p id="setupError" class="error"></p>
+    </div>
+    <div class="panel info">
+      <div class="eyebrow">HOW IT WORKS</div>
+      <div class="rule"><b>01</b><span>Drag across letters horizontally, vertically, or diagonally.</span></div>
+      <div class="rule"><b>02</b><span>Found words are claimed and removed from the remaining list.</span></div>
+      <div class="rule"><b>03</b><span>Every correct selection has a sound. Wrong selections give a short error sound.</span></div>
+      <div class="rule"><b>04</b><span>When the clock ends, every missed word is revealed on the board.</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="game" class="screen hidden">
+  <div class="game-head">
+    <div><div class="eyebrow" id="gameCategory">WORD SEARCH</div><h2 id="gameTitle">12 × 12</h2></div>
+    <div class="timer" id="timer">03:00</div>
+    <button id="quit" class="secondary">Quit</button>
+  </div>
+  <div class="game-layout">
+    <aside class="panel words-panel">
+      <div class="panel-head"><span class="eyebrow">WORDS</span><strong id="progress">0/0</strong></div>
+      <div id="wordList" class="word-list"></div>
+      <div class="players">
+        <div><span><i class="dot you"></i><b id="playerName">You</b></span><strong id="playerScore">0</strong></div>
+        <div id="aiScoreRow" class="hidden"><span><i class="dot ai"></i><b>AI</b></span><strong id="aiScore">0</strong></div>
+      </div>
+    </aside>
+    <div class="panel board-panel"><div id="grid" class="grid" aria-label="Word search grid"></div></div>
+  </div>
+  <div class="game-footer"><span>Drag or touch-drag across a word</span><span id="status"></span></div>
+</section>
+
+<section id="result" class="screen hidden">
+  <div class="panel result">
+    <div class="eyebrow">ROUND COMPLETE</div><div id="resultIcon" class="result-icon">✓</div>
+    <h1 id="resultTitle">Time!</h1><p id="resultText"></p>
+    <div id="finalScores" class="final-scores"></div>
+    <div class="reveal"><div class="eyebrow">MISSED WORDS REVEALED</div><div id="missedList" class="missed-list"></div></div>
+    <div class="result-actions"><button id="playAgain" class="primary">Play Again <b>→</b></button><button id="home" class="secondary">Back to WordUp</button></div>
+  </div>
+</section>
+</main>
+<div id="toast" class="toast"></div>
+<script src="/word-search.js?v=20260924-1"></script>
+</body></html>
