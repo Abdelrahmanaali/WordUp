@@ -1,5 +1,18 @@
 {
-  "name":"wordup","private":true,"version":"1.0.0",
-  "scripts":{"dev":"wrangler dev","deploy":"wrangler deploy","db:migrate":"wrangler d1 migrations apply WORDUP_DB --remote"},
-  "devDependencies":{"wrangler":"^4.39.0"}
+  "name": "wordup",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "wrangler dev",
+    "check": "node --check src/index.js && node --check src/word-search-room.js",
+    "build": "npm run check && wrangler deploy --dry-run",
+    "deploy": "wrangler deploy",
+    "db:migrate": "wrangler d1 migrations apply WORDUP_DB --remote"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "wrangler": "^4.68.0"
+  }
 }
