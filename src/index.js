@@ -9,6 +9,7 @@ const json=(d,s=200)=>new Response(JSON.stringify(d),{status:s,headers:{"content
 const nick=v=>String(v||"").trim().replace(/\s+/g," ").slice(0,18);
 const word=v=>String(v||"").trim().toLowerCase().replace(/[^a-z]/g,"").slice(0,5);
 const code=()=>{const c="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";return Array.from({length:6},()=>c[Math.floor(Math.random()*c.length)]).join("")};
+const isWebSocketUpgrade=req=>req.headers.get("Upgrade")?.toLowerCase()==="websocket";
 const cairoDate=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo"}).format(new Date());
 const daily=()=>{const day=cairoDate();let h=0;for(const c of day)h=(h*31+c.charCodeAt(0))>>>0;return WORDS[h%WORDS.length]};
 const randomWord=()=>WORDS[Math.floor(Math.random()*WORDS.length)];
@@ -32,8 +33,7 @@ export class GameRoom extends DurableObject{
  public(s){return{code:s.code,mode:s.mode,timer:s.timer,status:s.status,startedAt:s.startedAt,endedAt:s.endedAt,players:s.players.map(p=>({id:p.id,nickname:p.nickname,ready:p.ready,connected:p.connected,guesses:p.guesses.map(g=>attempt(s.word,g.guess))})),result:s.result?{winnerId:s.result.winnerId,winnerName:s.result.winnerName,type:s.result.type,word:s.word,reason:s.result.reason}:null}}
  async fetch(req){
   const u=new URL(req.url),s=await this.load();
-  if(req.headers.get("Upgrade")==="websocket"){
-   if(req.headers.get("Upgrade")!=="websocket")return new Response("WebSocket required",{status:426});
+  if(isWebSocketUpgrade(req)){
    const pid=u.searchParams.get("playerId"),name=nick(u.searchParams.get("nickname"));if(!pid||!name)return new Response("Missing player information",{status:400});
    let p=s.players.find(x=>x.id===pid);
    if(!p){if(s.players.length>=2)return new Response("Room is full",{status:409});p={id:pid,nickname:name,ready:false,guesses:[],connected:true};s.players.push(p)}else{p.nickname=name;p.connected=true}
